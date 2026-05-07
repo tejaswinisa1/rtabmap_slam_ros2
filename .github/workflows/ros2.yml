@@ -1,0 +1,53 @@
+name: UAV SLAM Build
+
+on:
+  push:
+    branches: [ ros2 ]
+  pull_request:
+    branches: [ ros2 ]
+
+jobs:
+  build:
+    name: Build UAV SLAM — ROS2 Humble (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    container:
+      image: osrf/ros:humble-desktop-full
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            ros-humble-rtabmap-ros \
+            ros-humble-realsense2-camera \
+            ros-humble-mavros \
+            ros-humble-mavros-extras \
+            ros-humble-tf2-ros \
+            ros-humble-cv-bridge \
+            python3-colcon-common-extensions \
+            python3-rosdep \
+            python3-opencv
+          /opt/ros/humble/lib/mavros/install_geographiclib_datasets.sh || true
+
+      - name: rosdep install
+        run: |
+          source /opt/ros/humble/setup.bash
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y \
+            --skip-keys "rtabmap_costmap_plugins rtabmap_demos nav2_msgs octomap_msgs grid_map_ros"
+
+      - name: Build UAV packages
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build \
+            --packages-select uav_nodes uav_slam_launch \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release \
+            --parallel-workers 2
+
+      - name: Verify entry points
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          ros2 pkg list | grep uav

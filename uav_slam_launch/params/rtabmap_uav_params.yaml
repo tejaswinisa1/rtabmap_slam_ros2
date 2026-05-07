@@ -1,0 +1,70 @@
+# RTAB-Map optimized parameters for UAV on Raspberry Pi 5
+# Target: stable SLAM at low CPU usage
+
+rtabmap:
+  ros__parameters:
+    # Core SLAM settings
+    frame_id: "base_link"
+    map_frame_id: "map"
+    odom_frame_id: "odom"
+    publish_tf: true
+    subscribe_depth: true
+    subscribe_rgbd: false
+    approx_sync: true
+
+    # Memory management - keep small for Pi 5
+    Mem/STMSize: "10"
+    Mem/IncrementalMemory: "true"
+    Mem/RehearsalSimilarity: "0.45"
+    Mem/BadSignaturesIgnored: "true"
+
+    # Detection rate - 1 Hz to save CPU
+    Rtabmap/DetectionRate: "1"
+    Rtabmap/TimeThr: "0"
+    Rtabmap/MemoryThr: "0"
+
+    # Visual features - limit for Pi 5
+    Vis/MaxFeatures: "400"
+    Vis/MinInliers: "15"
+    Vis/InlierDistance: "0.1"
+    Vis/EstimationType: "1"
+
+    # Disable 3D grid (UAV uses 2D footprint only)
+    Grid/3D: "false"
+    Grid/FromDepth: "false"
+    Grid/RangeMax: "0"
+
+    # Disable proximity detection by space (expensive)
+    RGBD/ProximityBySpace: "false"
+    RGBD/AngularUpdate: "0.1"
+    RGBD/LinearUpdate: "0.1"
+    RGBD/OptimizeFromGraphEnd: "false"
+
+    # Disable dense point cloud
+    RGBD/CreateOccupancyGrid: "false"
+
+    # Loop closure - lightweight
+    Kp/MaxFeatures: "400"
+    Kp/DetectorStrategy: "6"
+
+    # Optimizer
+    Optimizer/Strategy: "1"
+    Optimizer/Iterations: "20"
+
+rgbd_odometry:
+  ros__parameters:
+    frame_id: "base_link"
+    odom_frame_id: "odom"
+    publish_tf: true
+    approx_sync: true
+    wait_imu_to_init: false
+
+    # Feature limits for Pi 5
+    Vis/MaxFeatures: "400"
+    Vis/MinInliers: "10"
+    OdomF2M/MaxSize: "1000"
+    OdomF2M/MaxNewFeatures: "200"
+
+    # Odometry quality
+    Odom/ResetCountdown: "0"
+    Odom/Strategy: "0"

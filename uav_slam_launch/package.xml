@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>uav_slam_launch</name>
+  <version>1.0.0</version>
+  <description>UAV SLAM launch files for Raspberry Pi 5 + D435 + PX4</description>
+  <maintainer email="uav@example.com">UAV Team</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>rtabmap_slam</exec_depend>
+  <exec_depend>rtabmap_odom</exec_depend>
+  <exec_depend>rtabmap_sync</exec_depend>
+  <exec_depend>rtabmap_util</exec_depend>
+  <exec_depend>realsense2_camera</exec_depend>
+  <exec_depend>mavros</exec_depend>
+  <exec_depend>uav_nodes</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
