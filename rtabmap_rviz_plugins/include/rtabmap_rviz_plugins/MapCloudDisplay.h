@@ -3,7 +3,7 @@
 #ifndef MAP_CLOUD_DISPLAY_H
 #define MAP_CLOUD_DISPLAY_H
 
-#ifndef Q_MOC_RUN  // See: https://bugreports.qt-project.org/browse/QTBUG-22829
+#ifndef Q_MOC_RUN  
 
 #include <memory>
 #include <set>
