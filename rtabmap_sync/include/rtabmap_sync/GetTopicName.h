@@ -1,9 +1,4 @@
-/*
- * GetTopicName.h
- *
- *  Created on: Oct 1, 2021
- *      Author: mathieu
- */
+
 
 #ifndef INCLUDE_RTABMAP_ROS_GETTOPICNAME_H_
 #define INCLUDE_RTABMAP_ROS_GETTOPICNAME_H_
