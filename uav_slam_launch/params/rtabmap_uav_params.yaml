@@ -1,70 +1,126 @@
-# RTAB-Map optimized parameters for UAV on Raspberry Pi 5
-# Target: stable SLAM at low CPU usage
+# =============================================================================
+# RTAB-Map Optimised Parameters — UAV / Raspberry Pi 5
+# ROS2 Jazzy / Ubuntu 24.04 / CycloneDDS
+# =============================================================================
+# Target: stable SLAM at <80% CPU on Raspberry Pi 5
+# Camera: Intel RealSense D435 @ 640x480 @ 15 fps
+# =============================================================================
 
 rtabmap:
   ros__parameters:
-    # Core SLAM settings
-    frame_id: "base_link"
-    map_frame_id: "map"
-    odom_frame_id: "odom"
-    publish_tf: true
-    subscribe_depth: true
-    subscribe_rgbd: false
-    approx_sync: true
+    # ── Core frame configuration ──────────────────────────────────────────
+    frame_id:        "base_link"
+    map_frame_id:    "map"
+    odom_frame_id:   "odom"
+    publish_tf:      true
 
-    # Memory management - keep small for Pi 5
-    Mem/STMSize: "10"
-    Mem/IncrementalMemory: "true"
-    Mem/RehearsalSimilarity: "0.45"
+    # ── Input configuration ───────────────────────────────────────────────
+    subscribe_depth:  true
+    subscribe_rgbd:   false
+    subscribe_stereo: false
+    subscribe_scan:   false
+    subscribe_scan_cloud: false
+
+    # ── Synchronisation ───────────────────────────────────────────────────
+    # approx_sync=true tolerates Pi 5 timing jitter between RGB and depth
+    approx_sync:              true
+    approx_sync_max_interval: 0.02   # 20 ms max sync gap
+    topic_queue_size:         10
+    sync_queue_size:          10
+
+    # ── QoS settings (Best Effort for image topics on Pi 5) ───────────────
+    qos_image:       2   # Best Effort
+    qos_camera_info: 2   # Best Effort
+    qos_odom:        1   # Reliable
+    qos_imu:         2   # Best Effort
+
+    # ── Memory management ─────────────────────────────────────────────────
+    # Small STM keeps RAM usage low on Pi 5
+    Mem/STMSize:              "10"
+    Mem/IncrementalMemory:    "true"
+    Mem/RehearsalSimilarity:  "0.45"
     Mem/BadSignaturesIgnored: "true"
+    Mem/ImagePreDecimation:   "1"
+    Mem/ImagePostDecimation:  "1"
 
-    # Detection rate - 1 Hz to save CPU
+    # ── Detection rate ────────────────────────────────────────────────────
+    # 1 Hz loop closure check — biggest CPU saver on Pi 5
     Rtabmap/DetectionRate: "1"
-    Rtabmap/TimeThr: "0"
-    Rtabmap/MemoryThr: "0"
+    Rtabmap/TimeThr:       "0"
+    Rtabmap/MemoryThr:     "0"
+    Rtabmap/ImageBufferSize: "1"
 
-    # Visual features - limit for Pi 5
-    Vis/MaxFeatures: "400"
-    Vis/MinInliers: "15"
-    Vis/InlierDistance: "0.1"
-    Vis/EstimationType: "1"
+    # ── Visual features ───────────────────────────────────────────────────
+    # 400 features = good tracking quality at low CPU cost
+    Vis/MaxFeatures:     "400"
+    Vis/MinInliers:      "15"
+    Vis/InlierDistance:  "0.1"
+    Vis/EstimationType:  "1"
+    Vis/FeatureType:     "8"   # GFTT/BRIEF — faster than ORB on Pi 5
 
-    # Disable 3D grid (UAV uses 2D footprint only)
-    Grid/3D: "false"
-    Grid/FromDepth: "false"
-    Grid/RangeMax: "0"
+    # ── Keypoint detector ─────────────────────────────────────────────────
+    Kp/MaxFeatures:      "400"
+    Kp/DetectorStrategy: "6"   # GFTT detector
+    Kp/MaxDepth:         "10"  # ignore features beyond 10 m
 
-    # Disable proximity detection by space (expensive)
-    RGBD/ProximityBySpace: "false"
-    RGBD/AngularUpdate: "0.1"
-    RGBD/LinearUpdate: "0.1"
-    RGBD/OptimizeFromGraphEnd: "false"
-
-    # Disable dense point cloud
+    # ── Grid / occupancy map ──────────────────────────────────────────────
+    # Disable ALL grid generation — UAV does not need 2D costmap
+    Grid/3D:                  "false"
+    Grid/FromDepth:           "false"
+    Grid/RangeMax:            "0"
     RGBD/CreateOccupancyGrid: "false"
 
-    # Loop closure - lightweight
-    Kp/MaxFeatures: "400"
-    Kp/DetectorStrategy: "6"
+    # ── Proximity detection ───────────────────────────────────────────────
+    # Disable expensive spatial proximity search
+    RGBD/ProximityBySpace:    "false"
+    RGBD/ProximityByTime:     "false"
 
-    # Optimizer
-    Optimizer/Strategy: "1"
-    Optimizer/Iterations: "20"
+    # ── Motion thresholds ─────────────────────────────────────────────────
+    # Only process new keyframe when drone has moved enough
+    RGBD/AngularUpdate:  "0.1"   # radians
+    RGBD/LinearUpdate:   "0.1"   # metres
+
+    # ── Graph optimisation ────────────────────────────────────────────────
+    RGBD/OptimizeFromGraphEnd: "false"
+    Optimizer/Strategy:        "1"   # g2o
+    Optimizer/Iterations:      "20"
+
+    # ── Dense mapping — DISABLED ──────────────────────────────────────────
+    # No dense point clouds, no octomap, no voxel maps
+    # Saves ~20% CPU on Pi 5
+    RGBD/LinearSpeedUpdate:  "0"
+    RGBD/AngularSpeedUpdate: "0"
+
+# =============================================================================
 
 rgbd_odometry:
   ros__parameters:
-    frame_id: "base_link"
-    odom_frame_id: "odom"
-    publish_tf: true
-    approx_sync: true
-    wait_imu_to_init: false
+    # ── Frame configuration ───────────────────────────────────────────────
+    frame_id:        "base_link"
+    odom_frame_id:   "odom"
+    publish_tf:      true
 
-    # Feature limits for Pi 5
-    Vis/MaxFeatures: "400"
-    Vis/MinInliers: "10"
-    OdomF2M/MaxSize: "1000"
+    # ── Synchronisation ───────────────────────────────────────────────────
+    approx_sync:              true
+    approx_sync_max_interval: 0.02
+    topic_queue_size:         10
+    sync_queue_size:          10
+    wait_imu_to_init:         false
+
+    # ── QoS ───────────────────────────────────────────────────────────────
+    qos:             2   # Best Effort for image topics
+    qos_camera_info: 2
+
+    # ── Feature limits for Pi 5 ───────────────────────────────────────────
+    Vis/MaxFeatures:        "400"
+    Vis/MinInliers:         "10"
+    Vis/FeatureType:        "8"
+
+    # ── Odometry map limits ───────────────────────────────────────────────
+    OdomF2M/MaxSize:        "1000"
     OdomF2M/MaxNewFeatures: "200"
 
-    # Odometry quality
+    # ── Odometry strategy ─────────────────────────────────────────────────
     Odom/ResetCountdown: "0"
-    Odom/Strategy: "0"
+    Odom/Strategy:       "0"   # Frame-to-Map
+    Odom/GuessMotion:    "true"

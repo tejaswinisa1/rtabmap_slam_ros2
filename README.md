@@ -1,9 +1,7 @@
 # UAV SLAM Stack — ROS2 Jazzy / Ubuntu 24.04
 
 Lightweight RGB-D SLAM and autonomous coverage mission system for UAVs.
-Raspberry Pi 5 + Intel RealSense D435 + PX4 + MAVROS + CycloneDDS.
-
-> Migrated from ROS2 Humble / Ubuntu 22.04 to **ROS2 Jazzy / Ubuntu 24.04**
+**Raspberry Pi 5 + Intel RealSense D435 + PX4 + MAVROS + CycloneDDS**
 
 ---
 
@@ -11,77 +9,66 @@ Raspberry Pi 5 + Intel RealSense D435 + PX4 + MAVROS + CycloneDDS.
 
 1. [System Overview](#1-system-overview)
 2. [Hardware Requirements](#2-hardware-requirements)
-3. [Ubuntu 24.04 Installation](#3-ubuntu-2404-installation)
-4. [ROS2 Jazzy Installation](#4-ros2-jazzy-installation)
-5. [CycloneDDS Setup](#5-cyclonedds-setup)
-6. [librealsense Installation](#6-librealsense-installation)
-7. [realsense2_camera Installation](#7-realsense2_camera-installation)
-8. [MAVROS Installation](#8-mavros-installation)
-9. [PX4 Installation](#9-px4-installation)
-10. [Workspace Build Instructions](#10-workspace-build-instructions)
-11. [RTAB-Map Setup](#11-rtab-map-setup)
-12. [D435 Testing](#12-d435-testing)
-13. [RViz Setup](#13-rviz-setup)
+3. [Raspberry Pi 5 Setup](#3-raspberry-pi-5-setup)
+4. [Ubuntu 24.04 Setup](#4-ubuntu-2404-setup)
+5. [ROS2 Jazzy Installation](#5-ros2-jazzy-installation)
+6. [CycloneDDS Setup](#6-cyclonedds-setup)
+7. [librealsense Installation](#7-librealsense-installation)
+8. [realsense2_camera Installation](#8-realsense2_camera-installation)
+9. [MAVROS Installation](#9-mavros-installation)
+10. [PX4 Installation](#10-px4-installation)
+11. [Workspace Build Instructions](#11-workspace-build-instructions)
+12. [RTAB-Map Setup](#12-rtab-map-setup)
+13. [D435 Verification](#13-d435-verification)
 14. [TF Verification](#14-tf-verification)
-15. [PX4 SITL Testing](#15-px4-sitl-testing)
-16. [Real Drone Deployment](#16-real-drone-deployment)
-17. [Performance Optimization](#17-performance-optimization)
-18. [Troubleshooting](#18-troubleshooting)
-19. [Raspberry Pi 5 Optimization Guide](#19-raspberry-pi-5-optimization-guide)
-20. [UAV Deployment Workflow](#20-uav-deployment-workflow)
+15. [MAVROS Verification](#15-mavros-verification)
+16. [PX4 SITL Testing](#16-px4-sitl-testing)
+17. [RViz Testing](#17-rviz-testing)
+18. [Real Drone Bench Testing](#18-real-drone-bench-testing)
+19. [Hover Testing](#19-hover-testing)
+20. [Autonomous Mission Testing](#20-autonomous-mission-testing)
+21. [Performance Optimization Guide](#21-performance-optimization-guide)
+22. [Troubleshooting Guide](#22-troubleshooting-guide)
 
 ---
 
 ## 1. System Overview
 
-### Migration Notes (Humble → Jazzy)
-
-| Item | ROS2 Humble (old) | ROS2 Jazzy (new) |
-|------|-------------------|------------------|
-| Ubuntu | 22.04 LTS | 24.04 LTS |
-| Python | 3.10 | 3.12 |
-| Default RMW | FastDDS | CycloneDDS |
-| C++ standard | C++14 | C++17 |
-| `static_transform_publisher` | positional args | `--frame-id` named args |
-| `setup.py` | `packages=[pkg]` | `find_packages()` |
-| `nav2_msgs` | available | removed (UAV stack) |
-| `octomap_msgs` | available | removed (UAV stack) |
-| `grid_map_ros` | available | removed (UAV stack) |
-
 ### Architecture Pipeline
 
 ```
-Intel RealSense D435  (640×480 @ 15 fps)
-        │
-        ▼
-realsense2_camera (ROS2 Jazzy driver)
+Intel RealSense D435  (640x480 @ 15 fps)
+        |
+        v
+realsense2_camera
   /camera/color/image_raw
   /camera/aligned_depth_to_color/image_raw
   /camera/color/camera_info
-        │
-        ▼
+        |
+        v
 rtabmap_odom/rgbd_odometry
-  → /odom
-        │
-        ▼
-rtabmap_slam/rtabmap  ──────────────► /map
+  -> /odom  (nav_msgs/Odometry)
+        |
+        v
+rtabmap_slam/rtabmap  ──────────────> /map
   Lightweight mode:                   /rtabmap/odom
-  400 features, 1 Hz, no 3D grid
-        │
-        ▼
-vision_pose_bridge (uav_nodes)
-  → /mavros/vision_pose/pose
-        │
-        ▼
-MAVROS ──────────────────────────► PX4 EKF2 (vision fusion)
-        │
-        ▼
-lawnmower_planner → /uav/coverage_path
-path_optimizer    → /uav/optimized_path
-orb_detector      → /uav/orb_detections
-duplicate_filter  → /uav/filtered_detections
-        │
-        ▼
+  400 features, 1 Hz, no 3D grid,
+  no dense cloud, no octomap
+        |
+        v
+vision_pose_bridge  (uav_nodes)
+  -> /mavros/vision_pose/pose
+        |
+        v
+MAVROS ──────────────────────────> PX4 EKF2 (vision fusion)
+        |
+        v
+lawnmower_planner -> /uav/coverage_path
+path_optimizer    -> /uav/optimized_path
+orb_detector      -> /uav/orb_detections
+duplicate_filter  -> /uav/filtered_detections
+        |
+        v
 PX4 Waypoint Navigation
 ```
 
@@ -99,7 +86,7 @@ map
 
 ```
 rtabmap_slam_ros2/
-├── uav_slam_launch/          # Launch files, params, config
+├── uav_slam_launch/
 │   ├── launch/
 │   │   ├── slam_only.launch.py       # D435 + SLAM (no PX4)
 │   │   ├── slam_px4.launch.py        # SLAM + MAVROS + vision bridge
@@ -108,60 +95,130 @@ rtabmap_slam_ros2/
 │   ├── params/
 │   │   └── rtabmap_uav_params.yaml   # Pi 5-optimised RTAB-Map params
 │   ├── config/
-│   │   ├── cyclonedds.xml            # CycloneDDS config (Jazzy)
-│   │   ├── cyclonedds_env.sh         # DDS environment setup script
+│   │   ├── cyclonedds.xml            # CycloneDDS config
+│   │   ├── cyclonedds_env.sh         # DDS environment setup
 │   │   ├── mavros_params.yaml        # MAVROS plugin config
 │   │   ├── px4_ekf2_params.md        # PX4 EKF2 parameter guide
-│   │   └── uav_rviz.rviz             # RViz2 UAV monitoring config
+│   │   └── uav_rviz.rviz             # RViz2 UAV config
 │   └── scripts/
-│       └── benchmark_uav.sh          # Performance benchmarking
+│       └── benchmark_uav.sh          # Performance benchmark
 │
-└── uav_nodes/                # Custom UAV Python nodes (Python 3.12)
+└── uav_nodes/
     └── uav_nodes/
-        ├── lawnmower_planner.py
-        ├── path_optimizer.py
-        ├── orb_detector.py
-        ├── duplicate_filter.py
-        └── vision_pose_bridge.py
+        ├── lawnmower_planner.py      # Coverage path generator
+        ├── path_optimizer.py         # Chaikin path smoother
+        ├── orb_detector.py           # Lightweight ORB detection
+        ├── duplicate_filter.py       # Spatial/temporal dedup
+        └── vision_pose_bridge.py     # SLAM -> MAVROS bridge
+```
+
+### Quick Launch Reference
+
+```bash
+# Source environment (run once per terminal)
+source ~/uav_ws/install/setup.bash
+source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh
+
+# SLAM only (indoor test, no PX4)
+ros2 launch uav_slam_launch slam_only.launch.py
+
+# SLAM + RViz
+ros2 launch uav_slam_launch slam_only.launch.py rviz:=true
+
+# SLAM + PX4 hardware
+ros2 launch uav_slam_launch slam_px4.launch.py fcu_url:=/dev/ttyACM0:921600
+
+# Full autonomous coverage mission
+ros2 launch uav_slam_launch full_uav_stack.launch.py \
+  arena_width:=50.0 arena_height:=50.0 altitude:=10.0 speed:=3.0
+
+# PX4 SITL simulation
+ros2 launch uav_slam_launch px4_sitl.launch.py
+
+# Localization mode (existing map)
+ros2 launch uav_slam_launch slam_only.launch.py localization:=true
+
+# Performance benchmark
+bash ~/uav_ws/src/uav_slam_launch/scripts/benchmark_uav.sh 60
 ```
 
 ---
 
 ## 2. Hardware Requirements
 
-| Component | Specification |
-|-----------|--------------|
-| Companion Computer | Raspberry Pi 5 (8 GB RAM recommended) |
-| Depth Camera | Intel RealSense D435 |
-| Flight Controller | Cube Orange (PX4 v1.14+) |
-| Serial Link | USB-C or UART (Cube Orange ↔ Pi 5) |
-| Storage | 32 GB+ microSD (A2 rated) |
-| Power | 5V/5A USB-C for Pi 5 |
-| Cooling | Heatsink + active fan (required) |
+| Component | Specification | Notes |
+|-----------|--------------|-------|
+| Companion Computer | Raspberry Pi 5 (8 GB RAM) | 4 GB minimum |
+| Depth Camera | Intel RealSense D435 | USB 3.0 required |
+| Flight Controller | Cube Orange | PX4 v1.14+ |
+| Serial Link | USB-C or UART | Cube Orange to Pi 5 |
+| Storage | 32 GB+ microSD (A2 rated) | |
+| Power | 5V/5A USB-C for Pi 5 | Separate from FC |
+| Cooling | Heatsink + active fan | Required for flight |
 
 ---
 
-## 3. Ubuntu 24.04 Installation
+## 3. Raspberry Pi 5 Setup
+
+### Flash Ubuntu 24.04
 
 Download Ubuntu 24.04 Server ARM64 from https://ubuntu.com/download/raspberry-pi
 
-Flash with Raspberry Pi Imager, then:
+Flash with Raspberry Pi Imager. Enable SSH during setup.
+
+### First boot optimizations
 
 ```bash
+# Update system
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y \
-  curl gnupg2 lsb-release build-essential git \
-  software-properties-common
 
-# Set locale (required for ROS2)
-sudo locale-gen en_US en_US.UTF-8
-sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-export LANG=en_US.UTF-8
+# Install essentials
+sudo apt install -y curl gnupg2 lsb-release build-essential git htop
+
+# Add 2 GB swap (critical for Pi 5 with SLAM)
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Set CPU governor to performance
+echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+
+# Disable unused services to free CPU
+sudo systemctl disable bluetooth cups avahi-daemon 2>/dev/null || true
+```
+
+### Verify Pi 5 hardware
+
+```bash
+# Check CPU temperature
+vcgencmd measure_temp
+
+# Check throttling status (0x0 = no throttling)
+vcgencmd get_throttled
+
+# Check available memory
+free -h
 ```
 
 ---
 
-## 4. ROS2 Jazzy Installation
+## 4. Ubuntu 24.04 Setup
+
+```bash
+# Set locale (required for ROS2)
+sudo locale-gen en_US en_US.UTF-8
+sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+export LANG=en_US.UTF-8
+
+# Install software-properties-common
+sudo apt install -y software-properties-common
+```
+
+---
+
+## 5. ROS2 Jazzy Installation
 
 ```bash
 # Add ROS2 apt repository
@@ -180,20 +237,25 @@ sudo apt install -y \
   python3-colcon-common-extensions \
   python3-rosdep \
   python3-vcstool \
-  python3-setuptools
+  python3-setuptools \
+  python3-pip
 
 sudo rosdep init
 rosdep update
 
+# Source ROS2 in every shell
 echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
 source ~/.bashrc
+
+# Verify
+ros2 --version
 ```
 
 ---
 
-## 5. CycloneDDS Setup
+## 6. CycloneDDS Setup
 
-ROS2 Jazzy uses CycloneDDS as the default RMW. Configure it for low-latency UAV use:
+ROS2 Jazzy uses CycloneDDS as the recommended RMW for low-latency UAV use.
 
 ```bash
 # Install CycloneDDS
@@ -201,25 +263,32 @@ sudo apt install -y \
   ros-jazzy-cyclonedds \
   ros-jazzy-rmw-cyclonedds-cpp
 
-# Set as default RMW (add to ~/.bashrc)
+# Set as default RMW permanently
 echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> ~/.bashrc
-
-# Point to optimised UAV config (after workspace build)
-echo 'export CYCLONEDDS_URI=file://$HOME/uav_ws/src/uav_slam_launch/config/cyclonedds.xml' >> ~/.bashrc
-
+echo "export ROS_DOMAIN_ID=0" >> ~/.bashrc
 source ~/.bashrc
-```
 
-Verify CycloneDDS is active:
-
-```bash
+# Verify
 ros2 doctor --report | grep rmw
 # Expected: rmw_implementation: rmw_cyclonedds_cpp
 ```
 
+### Source the UAV CycloneDDS config (after workspace build)
+
+```bash
+# Add to ~/.bashrc for permanent effect:
+echo 'source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh' >> ~/.bashrc
+source ~/.bashrc
+```
+
+The `cyclonedds_env.sh` script sets:
+- `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`
+- `CYCLONEDDS_URI` pointing to the optimised `cyclonedds.xml`
+- `ROS_DOMAIN_ID=0`
+
 ---
 
-## 6. librealsense Installation
+## 7. librealsense Installation
 
 ```bash
 # Add Intel RealSense repository
@@ -238,17 +307,18 @@ sudo apt install -y \
   librealsense2-utils \
   librealsense2-dev
 
-# Add user to plugdev group
+# USB access
 sudo usermod -aG plugdev $USER
 # Log out and back in
 
 # Verify
 rs-enumerate-devices
+# Expected: Intel RealSense D435
 ```
 
 ---
 
-## 7. realsense2_camera Installation
+## 8. realsense2_camera Installation
 
 ```bash
 sudo apt install -y \
@@ -258,7 +328,7 @@ sudo apt install -y \
 
 ---
 
-## 8. MAVROS Installation
+## 9. MAVROS Installation
 
 ```bash
 sudo apt install -y \
@@ -266,48 +336,51 @@ sudo apt install -y \
   ros-jazzy-mavros-extras \
   ros-jazzy-mavros-msgs
 
-# Install GeographicLib datasets (required)
+# Required GeographicLib datasets
 sudo /opt/ros/jazzy/lib/mavros/install_geographiclib_datasets.sh
 
 # Serial port access
 sudo usermod -aG dialout $USER
+# Log out and back in
 ```
 
 ---
 
-## 9. PX4 Installation
+## 10. PX4 Installation
 
-Flash PX4 v1.14+ to Cube Orange via QGroundControl:
-1. Download QGC: https://qgroundcontrol.com/downloads/
+### Flash to Cube Orange
+
+1. Download QGroundControl: https://qgroundcontrol.com/downloads/
 2. Connect Cube Orange via USB
-3. Vehicle Setup → Firmware → PX4 Pro Stable v1.14+
+3. Vehicle Setup -> Firmware -> PX4 Pro Stable v1.14+
+4. Configure EKF2 parameters (see `config/px4_ekf2_params.md`)
 
-Configure EKF2 parameters (see `config/px4_ekf2_params.md`):
-
+Key parameters:
 ```
 EKF2_AID_MASK  = 24   (vision position + vision yaw)
 EKF2_HGT_REF   = 3    (vision height)
-EKF2_EV_DELAY  = 50   (ms)
+EKF2_EV_DELAY  = 50   (ms, tune to your system)
 EKF2_EV_CTRL   = 15
 COM_ARM_WO_GPS = 1
+EKF2_GPS_CTRL  = 0
 ```
 
-For SITL (development machine only, not Pi 5):
+### PX4 SITL (development machine only, not Pi 5)
 
 ```bash
 git clone https://github.com/PX4/PX4-Autopilot.git --recursive ~/PX4-Autopilot
 cd ~/PX4-Autopilot
 bash ./Tools/setup/ubuntu.sh
-# Build with Gazebo (Jazzy uses gz-sim, not gazebo-classic)
+# Build with Gazebo (Jazzy uses gz-sim)
 make px4_sitl gz_x500
 ```
 
 ---
 
-## 10. Workspace Build Instructions
+## 11. Workspace Build Instructions
 
 ```bash
-# Install RTAB-Map and additional deps
+# Install RTAB-Map and additional dependencies
 sudo apt install -y \
   ros-jazzy-rtabmap-ros \
   ros-jazzy-tf2-ros \
@@ -345,47 +418,43 @@ source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh
 
 ---
 
-## 11. RTAB-Map Setup
+## 12. RTAB-Map Setup
 
-RTAB-Map is installed via apt (`ros-jazzy-rtabmap-ros`). No source build needed.
-
-Verify installation:
+RTAB-Map is installed via apt. No source build needed.
 
 ```bash
+# Verify installation
 ros2 pkg list | grep rtabmap
-# Expected:
-#   rtabmap_conversions
-#   rtabmap_msgs
-#   rtabmap_odom
-#   rtabmap_slam
-#   rtabmap_sync
-#   rtabmap_util
-#   rtabmap_viz
+# Expected: rtabmap_odom, rtabmap_slam, rtabmap_sync, rtabmap_util, rtabmap_msgs
+
+# Check version
+ros2 pkg xml rtabmap_slam | grep version
 ```
 
-Key optimised parameters (in `params/rtabmap_uav_params.yaml`):
+Key optimised parameters in `params/rtabmap_uav_params.yaml`:
 
-```yaml
-Vis/MaxFeatures:          "400"   # limit features for Pi 5
-Rtabmap/DetectionRate:    "1"     # 1 Hz loop closure check
-Grid/3D:                  "false" # no dense 3D grid
-Grid/FromDepth:           "false" # no depth-based grid
-RGBD/ProximityBySpace:    "false" # no expensive proximity search
-RGBD/CreateOccupancyGrid: "false" # no occupancy grid
-Mem/STMSize:              "10"    # small short-term memory
-approx_sync:              true    # tolerates Pi 5 timing jitter
-```
+| Parameter | Value | Reason |
+|-----------|-------|--------|
+| `Vis/MaxFeatures` | 400 | Limits CPU on Pi 5 |
+| `Rtabmap/DetectionRate` | 1 Hz | Biggest CPU saver |
+| `Grid/3D` | false | No dense 3D grid |
+| `Grid/FromDepth` | false | No depth-based grid |
+| `RGBD/ProximityBySpace` | false | No expensive search |
+| `RGBD/CreateOccupancyGrid` | false | No 2D costmap |
+| `Mem/STMSize` | 10 | Small short-term memory |
+| `approx_sync` | true | Tolerates Pi 5 jitter |
+| `qos_image` | 2 (Best Effort) | Reduces backpressure |
 
 ---
 
-## 12. D435 Testing
+## 13. D435 Verification
 
 ```bash
 # Plug D435 into USB 3.0 (blue port)
 rs-enumerate-devices
-# Expected: Intel RealSense D435
+# Expected: Intel RealSense D435, Serial: XXXXXXXXXX
 
-# Launch camera
+# Launch camera driver
 ros2 launch realsense2_camera rs_launch.py \
   align_depth.enable:=true \
   enable_sync:=true \
@@ -394,42 +463,31 @@ ros2 launch realsense2_camera rs_launch.py \
   pointcloud.enable:=false
 
 # Verify topics
+ros2 topic list | grep camera
 ros2 topic hz /camera/color/image_raw
 # Expected: ~15.0 Hz
 
 ros2 topic hz /camera/aligned_depth_to_color/image_raw
 # Expected: ~15.0 Hz
 
-ros2 topic list | grep camera
+# Check image quality
+ros2 run rqt_image_view rqt_image_view
+# Select /camera/color/image_raw
 ```
-
----
-
-## 13. RViz Setup
-
-```bash
-# Launch SLAM with RViz
-ros2 launch uav_slam_launch slam_only.launch.py rviz:=true
-
-# Or open manually
-rviz2 -d ~/uav_ws/src/uav_slam_launch/config/uav_rviz.rviz
-```
-
-Expected displays:
-- TF tree: `map → odom → base_link → camera_link`
-- Map: 2D occupancy grid
-- Odometry: arrow tracking movement
-- RGB Image: live D435 feed
-- Coverage Path: lawnmower waypoints
 
 ---
 
 ## 14. TF Verification
 
 ```bash
-# View full TF tree
+# Launch SLAM first
+ros2 launch uav_slam_launch slam_only.launch.py
+
+# In another terminal:
+
+# View full TF tree (generates frames.pdf)
 ros2 run tf2_tools view_frames
-# Opens frames.pdf — verify: map → odom → base_link → camera_link
+evince frames.pdf
 
 # Check specific transforms
 ros2 run tf2_ros tf2_echo map base_link
@@ -437,36 +495,83 @@ ros2 run tf2_ros tf2_echo odom base_link
 ros2 run tf2_ros tf2_echo base_link camera_link
 
 # Check for TF errors
-ros2 topic echo /rosout 2>/dev/null | grep -i "tf\|extrapolat"
+ros2 topic echo /rosout 2>/dev/null | grep -i "tf\|extrapolat\|transform"
 ```
 
 Expected TF tree:
 ```
-map → odom → base_link → camera_link → camera_color_optical_frame
+map -> odom -> base_link -> camera_link -> camera_color_optical_frame
+```
+
+Common fixes:
+
+**`base_link -> camera_link` missing:**
+```bash
+# Jazzy static_transform_publisher uses named args:
+ros2 run tf2_ros static_transform_publisher \
+  --x 0.05 --y 0 --z 0.02 \
+  --roll 0 --pitch 0 --yaw 0 \
+  --frame-id base_link --child-frame-id camera_link
+```
+
+**TF extrapolation errors:**
+```bash
+# Verify system clock is synced
+timedatectl status
+sudo apt install -y chrony && sudo systemctl enable --now chrony
 ```
 
 ---
 
-## 15. PX4 SITL Testing
+## 15. MAVROS Verification
 
 ```bash
-# Terminal 1: PX4 SITL with Gazebo (Jazzy uses gz-sim)
+# Launch SLAM + MAVROS
+ros2 launch uav_slam_launch slam_px4.launch.py fcu_url:=/dev/ttyACM0:921600
+
+# Check connection
+ros2 topic echo /mavros/state --once
+# Expected: connected: True, armed: False
+
+# Check heartbeat rate
+ros2 topic hz /mavros/state
+# Expected: ~1 Hz
+
+# Check vision pose flowing
+ros2 topic echo /mavros/vision_pose/pose --once
+ros2 topic hz /mavros/vision_pose/pose
+# Expected: ~15 Hz
+
+# Check local position (from PX4 EKF2)
+ros2 topic echo /mavros/local_position/pose --once
+
+# Check estimator status
+ros2 topic echo /mavros/estimator_status --once
+# pos_horiz_accuracy < 0.5 m = good fusion
+```
+
+---
+
+## 16. PX4 SITL Testing
+
+```bash
+# Terminal 1: PX4 SITL with Gazebo
 cd ~/PX4-Autopilot
 make px4_sitl gz_x500
 
 # Terminal 2: SLAM + MAVROS bridge
+source ~/uav_ws/install/setup.bash
 source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh
 ros2 launch uav_slam_launch px4_sitl.launch.py
 
-# Verify MAVROS connection
+# Terminal 3: Verify
 ros2 topic echo /mavros/state --once
-# Expected: connected: True
+# connected: True
 
-# Verify vision pose flowing
 ros2 topic hz /mavros/vision_pose/pose
-# Expected: ~15 Hz
+# ~15 Hz
 
-# Arm and takeoff (OFFBOARD mode)
+# Arm and takeoff in OFFBOARD mode
 ros2 run mavros mavsys mode -c OFFBOARD
 ros2 run mavros mavsafety arm
 ros2 topic pub /mavros/setpoint_position/local \
@@ -477,55 +582,110 @@ ros2 topic pub /mavros/setpoint_position/local \
 
 ---
 
-## 16. Real Drone Deployment
+## 17. RViz Testing
 
-### Pre-flight checklist
+```bash
+# Launch SLAM with RViz
+ros2 launch uav_slam_launch slam_only.launch.py rviz:=true
+
+# Or open manually
+rviz2 -d ~/uav_ws/src/uav_slam_launch/config/uav_rviz.rviz
+```
+
+Expected displays:
+- **TF**: `map -> odom -> base_link -> camera_link`
+- **Map**: 2D occupancy grid building as you move
+- **Odometry**: arrow tracking camera movement
+- **RGB Image**: live D435 color feed
+- **Coverage Path**: lawnmower waypoints (after full_uav_stack launch)
+
+---
+
+## 18. Real Drone Bench Testing
+
+**Always test with props OFF first.**
 
 ```bash
 # 1. Source environment
 source ~/uav_ws/install/setup.bash
 source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh
 
-# 2. Verify all topics
-ros2 topic list | grep -E "camera|odom|map|mavros"
+# 2. Launch full stack
+ros2 launch uav_slam_launch slam_px4.launch.py fcu_url:=/dev/ttyACM0:921600
 
-# 3. Check topic rates
-ros2 topic hz /camera/color/image_raw
-ros2 topic hz /odom
-ros2 topic hz /mavros/vision_pose/pose
+# 3. Verify all topics (in another terminal)
+ros2 topic hz /camera/color/image_raw   # ~15 Hz
+ros2 topic hz /odom                      # ~15 Hz
+ros2 topic hz /mavros/vision_pose/pose   # ~15 Hz
+ros2 topic echo /mavros/state --once     # connected: True
 
 # 4. Verify TF tree
 ros2 run tf2_tools view_frames
 
-# 5. Check MAVROS
-ros2 topic echo /mavros/state --once
+# 5. Run 60-second benchmark
+bash ~/uav_ws/src/uav_slam_launch/scripts/benchmark_uav.sh 60
 
 # 6. Monitor temperature
-watch -n 2 vcgencmd measure_temp
+watch -n 2 'vcgencmd measure_temp && vcgencmd get_throttled'
 ```
 
-### Launch sequences
+Pass criteria:
+- All topics publishing at expected rates
+- TF tree complete: `map -> odom -> base_link -> camera_link`
+- MAVROS connected
+- CPU < 80%
+- Temperature < 75 degrees C
+
+---
+
+## 19. Hover Testing
+
+**Props on. Low altitude. Safety pilot present.**
 
 ```bash
-# SLAM only (indoor test, no PX4)
-ros2 launch uav_slam_launch slam_only.launch.py
-
-# SLAM + PX4 (hardware flight)
+# Launch full stack
 ros2 launch uav_slam_launch slam_px4.launch.py fcu_url:=/dev/ttyACM0:921600
 
-# Full autonomous coverage mission
-ros2 launch uav_slam_launch full_uav_stack.launch.py \
-  arena_width:=50.0 arena_height:=50.0 altitude:=10.0 speed:=3.0
+# Monitor during hover
+ros2 topic hz /mavros/vision_pose/pose   # must be >10 Hz
+ros2 topic echo /mavros/local_position/pose --once
+watch -n 1 vcgencmd measure_temp
+```
 
-# Localization mode (existing map)
-ros2 launch uav_slam_launch slam_only.launch.py localization:=true
+Pass criteria:
+- Stable hover with vision fusion active
+- Position hold within +/- 0.3 m
+- CPU < 80%, temperature < 75 degrees C
+- No TF extrapolation errors
+
+---
+
+## 20. Autonomous Mission Testing
+
+```bash
+# Launch full mission stack
+ros2 launch uav_slam_launch full_uav_stack.launch.py \
+  fcu_url:=/dev/ttyACM0:921600 \
+  arena_width:=20.0 \
+  arena_height:=20.0 \
+  overlap:=0.2 \
+  altitude:=5.0 \
+  speed:=2.0
+
+# Monitor mission topics
+ros2 topic echo /uav/coverage_path --once | head -20
+ros2 topic echo /uav/optimized_path --once | head -20
+ros2 topic echo /uav/filtered_detections
+
+# Run benchmark during mission
+bash ~/uav_ws/src/uav_slam_launch/scripts/benchmark_uav.sh 120
 ```
 
 ---
 
-## 17. Performance Optimization
+## 21. Performance Optimization Guide
 
-### Expected CPU usage (Pi 5, 4-core, Jazzy)
+### Expected CPU usage (Pi 5, 4-core, Jazzy + CycloneDDS)
 
 | Component | CPU |
 |-----------|-----|
@@ -534,157 +694,29 @@ ros2 launch uav_slam_launch slam_only.launch.py localization:=true
 | rtabmap (1 Hz) | ~15% |
 | uav_nodes (all 5) | ~5% |
 | MAVROS | ~3% |
-| CycloneDDS overhead | ~1% |
+| CycloneDDS | ~1% |
 | **Total** | **~57%** |
 
 ### Reduce CPU if needed
 
+Edit `params/rtabmap_uav_params.yaml`:
+
 ```yaml
-# Edit params/rtabmap_uav_params.yaml:
-Vis/MaxFeatures: "200"        # reduce from 400
-Rtabmap/DetectionRate: "0.5"  # reduce from 1 Hz
-OdomF2M/MaxSize: "500"        # reduce from 1000
+# Step 1: Reduce features
+Vis/MaxFeatures: "200"
+
+# Step 2: Reduce detection rate
+Rtabmap/DetectionRate: "0.5"
+
+# Step 3: Reduce odometry map size
+OdomF2M/MaxSize: "500"
 ```
 
-```bash
-# Reduce camera FPS
-# In slam_only.launch.py:
-# rgb_camera.profile: '640x480x10'  # reduce from 15
+Reduce camera FPS in `slam_only.launch.py`:
+```python
+'rgb_camera.profile': '640x480x10',   # reduce from 15
+'depth_module.profile': '640x480x10',
 ```
-
-### Add swap (recommended for Pi 5)
-
-```bash
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-```
-
-### Run benchmark
-
-```bash
-# Launch stack first, then:
-bash ~/uav_ws/src/uav_slam_launch/scripts/benchmark_uav.sh 60
-```
-
----
-
-## 18. Troubleshooting
-
-### CycloneDDS issues
-
-**`RMW_IMPLEMENTATION` not set**
-```bash
-source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh
-# Or add to ~/.bashrc permanently
-```
-
-**Nodes can't discover each other**
-```bash
-# Check ROS_DOMAIN_ID matches on all terminals
-echo $ROS_DOMAIN_ID  # should be 0
-# Check cyclonedds.xml NetworkInterfaceAddress
-# Change 'lo' to your actual interface (eth0, wlan0) for multi-machine
-```
-
-### TF issues
-
-**`map → odom` not publishing**
-```bash
-ros2 node list | grep rtabmap
-ros2 topic echo /odom --once
-# Fix: ensure rgbd_odometry is running
-```
-
-**`base_link → camera_link` missing**
-```bash
-# Jazzy static_transform_publisher uses named args:
-ros2 run tf2_ros static_transform_publisher \
-  --x 0.05 --y 0 --z 0.02 \
-  --roll 0 --pitch 0 --yaw 0 \
-  --frame-id base_link --child-frame-id camera_link
-```
-
-### MAVROS issues
-
-**Not connecting to Cube Orange**
-```bash
-ls /dev/ttyACM*
-sudo chmod 666 /dev/ttyACM0
-# Or permanently: sudo usermod -aG dialout $USER
-```
-
-**Vision pose not accepted by PX4**
-```bash
-# Verify in QGC: EKF2_AID_MASK=24, EKF2_EV_CTRL=15
-ros2 topic hz /mavros/vision_pose/pose  # should be >10 Hz
-```
-
-### RealSense issues
-
-**Camera not detected**
-```bash
-# Use USB 3.0 (blue) port
-rs-enumerate-devices
-# If empty: unplug, wait 5s, replug
-```
-
-**Low FPS / frame drops**
-```bash
-# Check USB bandwidth
-lsusb -t
-# Reduce profile: rgb_camera.profile:=640x480x10
-```
-
-### Python 3.12 issues
-
-**`setup.py` deprecation warning**
-```bash
-# Already fixed: setup.py uses find_packages()
-# If you see warnings about distutils, install:
-pip3 install --user setuptools==68.0.0
-```
-
-**Import errors in uav_nodes**
-```bash
-# Rebuild after any Python changes:
-colcon build --packages-select uav_nodes --symlink-install
-source install/setup.bash
-```
-
-### High CPU usage
-
-```bash
-# Check which process is using CPU
-htop  # sort by CPU (press F6)
-
-# Check thermal throttling
-vcgencmd get_throttled
-# 0x0 = no throttling
-# 0x50005 = currently throttled
-
-# Check temperature
-vcgencmd measure_temp
-# Should be < 80°C
-```
-
----
-
-## 19. Raspberry Pi 5 Optimization Guide
-
-### Why 640×480 @ 15 fps?
-
-The Pi 5 ARM Cortex-A76 can process ~25 ms per frame at 640×480 with 400 ORB features. At 1080p this becomes ~100 ms — too slow for stable odometry. At 30 fps the frame budget drops to 33 ms, leaving no headroom for thermal throttling.
-
-### Why CycloneDDS over FastDDS?
-
-CycloneDDS has lower CPU overhead for local (single-machine) communication. On Pi 5, this saves ~2-3% CPU compared to FastDDS, which matters when running near the 80% target.
-
-### Why dense mapping is disabled?
-
-`Grid/3D=false` and `Grid/FromDepth=false` eliminate the largest CPU consumer in RTAB-Map. For UAV coverage missions, a 2D pose graph is sufficient. Dense reconstruction can be done offline from the saved `.db` file on a more powerful machine.
 
 ### Thermal management
 
@@ -692,120 +724,98 @@ CycloneDDS has lower CPU overhead for local (single-machine) communication. On P
 # Monitor continuously
 watch -n 2 'vcgencmd measure_temp && vcgencmd get_throttled'
 
-# If throttling occurs:
+# If throttling (get_throttled != 0x0):
 # 1. Add active cooling (fan)
 # 2. Reduce FPS to 10
 # 3. Reduce Vis/MaxFeatures to 200
 # 4. Reduce Rtabmap/DetectionRate to 0.5
 ```
 
-### Pi 5 boot optimizations
+### Memory optimization
 
 ```bash
-# Disable unnecessary services
-sudo systemctl disable bluetooth
-sudo systemctl disable cups
-sudo systemctl disable avahi-daemon
+# Check current usage
+free -h
 
-# Set CPU governor to performance
-echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-
-# Increase GPU memory split (not needed for headless)
-# In /boot/firmware/config.txt:
-# gpu_mem=16
+# Add swap if not done
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
 ---
 
-## 20. UAV Deployment Workflow
+## 22. Troubleshooting Guide
 
-### Step 1 — Ground test (props off)
+### CycloneDDS not active
 
 ```bash
-# Launch full stack
-ros2 launch uav_slam_launch slam_px4.launch.py fcu_url:=/dev/ttyACM0:921600
-
-# Verify all systems
-ros2 topic hz /camera/color/image_raw   # ~15 Hz
-ros2 topic hz /odom                      # ~15 Hz
-ros2 topic hz /mavros/vision_pose/pose   # ~15 Hz
-ros2 topic echo /mavros/state --once     # connected: True
-
-# Run benchmark
-bash ~/uav_ws/src/uav_slam_launch/scripts/benchmark_uav.sh 30
+echo $RMW_IMPLEMENTATION
+# If empty: source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh
+ros2 doctor --report | grep rmw
 ```
 
-### Step 2 — Static SLAM test
-
-Move camera by hand slowly. Verify:
-- `/odom` tracks movement smoothly
-- `/map` builds correctly in RViz
-- Loop closure detected when returning to start
-- CPU stays below 80%
-
-### Step 3 — Hover test (props on, 1 m altitude)
+### Camera not detected
 
 ```bash
-# Monitor during hover
-ros2 topic hz /mavros/vision_pose/pose
-ros2 topic echo /mavros/local_position/pose --once
-watch -n 1 vcgencmd measure_temp
+# Use USB 3.0 (blue) port
+rs-enumerate-devices
+# If empty: unplug, wait 5s, replug
+lsusb | grep Intel
+# Check USB bandwidth: lsusb -t
 ```
 
-Pass criteria: stable hover, position hold ±0.3 m, CPU < 80%, temp < 75°C.
-
-### Step 4 — Slow waypoint test
+### MAVROS not connecting
 
 ```bash
-ros2 topic pub /mavros/setpoint_position/local \
-  geometry_msgs/PoseStamped \
-  "{header: {frame_id: 'map'}, pose: {position: {x: 5.0, y: 0.0, z: 3.0}}}" \
-  --rate 10
+ls /dev/ttyACM*
+sudo chmod 666 /dev/ttyACM0
+# Permanent fix:
+sudo usermod -aG dialout $USER
 ```
 
-### Step 5 — Full autonomous coverage mission
+### Vision pose not accepted by PX4
 
 ```bash
-ros2 launch uav_slam_launch full_uav_stack.launch.py \
-  fcu_url:=/dev/ttyACM0:921600 \
-  arena_width:=50.0 \
-  arena_height:=50.0 \
-  overlap:=0.2 \
-  altitude:=10.0 \
-  speed:=3.0
+# Verify in QGC: EKF2_AID_MASK=24, EKF2_EV_CTRL=15
+ros2 topic hz /mavros/vision_pose/pose  # must be >10 Hz
+# Increase EKF2_EV_DELAY by 10ms increments until stable
 ```
 
-Monitor:
-- `/uav/coverage_path` — lawnmower path generated
-- `/uav/optimized_path` — smoothed path
-- `/uav/filtered_detections` — deduplicated detections
-- CPU < 80%, temperature < 75°C throughout mission
-
----
-
-## Quick Reference
+### TF extrapolation errors
 
 ```bash
-# Environment setup (run once per terminal)
+# Check clock sync
+timedatectl status
+sudo systemctl enable --now chrony
+# Verify approx_sync=true in params file
+```
+
+### High CPU usage
+
+```bash
+htop  # sort by CPU (F6)
+vcgencmd get_throttled  # check thermal throttling
+# Apply reductions from Performance Optimization section
+```
+
+### RTAB-Map crashes (OOM)
+
+```bash
+# Verify swap is active
+swapon --show
+# Reduce memory params:
+# Mem/STMSize: "5"
+# Vis/MaxFeatures: "200"
+# OdomF2M/MaxSize: "500"
+```
+
+### Python 3.12 import errors
+
+```bash
+# Rebuild after any Python changes
+colcon build --packages-select uav_nodes --symlink-install
 source ~/uav_ws/install/setup.bash
-source ~/uav_ws/src/uav_slam_launch/config/cyclonedds_env.sh
-
-# SLAM only
-ros2 launch uav_slam_launch slam_only.launch.py
-
-# SLAM + RViz
-ros2 launch uav_slam_launch slam_only.launch.py rviz:=true
-
-# SLAM + PX4
-ros2 launch uav_slam_launch slam_px4.launch.py fcu_url:=/dev/ttyACM0:921600
-
-# Full mission
-ros2 launch uav_slam_launch full_uav_stack.launch.py \
-  arena_width:=50.0 arena_height:=50.0 altitude:=10.0
-
-# SITL
-ros2 launch uav_slam_launch px4_sitl.launch.py
-
-# Benchmark
-bash ~/uav_ws/src/uav_slam_launch/scripts/benchmark_uav.sh 60
 ```

@@ -1,39 +1,46 @@
 {
+    "name": "UAV SLAM — ROS2 Jazzy / Ubuntu 24.04",
     "build": {
-      "dockerfile": "Dockerfile",
-      "pull": true
+        "dockerfile": "Dockerfile",
+        "pull": true
     },
     "remoteUser": "vscode",
     "customizations": {
         "vscode": {
-          "extensions": [
-            "ms-vscode.cpptools-themes",
-            "ms-vscode.cmake-tools", 
-            "ms-vscode.cpptools-extension-pack",
-            "ms-azuretools.vscode-docker",
-            "ms-python.python"]
+            "extensions": [
+                "ms-vscode.cpptools-themes",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.cpptools-extension-pack",
+                "ms-python.python",
+                "ms-python.pylint",
+                "twxs.cmake"
+            ],
+            "settings": {
+                "python.autoComplete.extraPaths": [
+                    "/opt/ros/jazzy/lib/python3/dist-packages"
+                ],
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "cmake.configureArgs": [
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DCMAKE_CXX_STANDARD=17"
+                ]
+            }
         }
-      },
-    "settings": {
-      "python.autoComplete.extraPaths": [
-        "/opt/ros/jazzy/lib/python3/dist-packages"
-      ],
-      "terminal.integrated.defaultProfile.linux": "bash"
     },
-    "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/ros2_ws/src/rtabmap_ros,type=bind",
-    "workspaceFolder": "/home/vscode/ros2_ws",
-    "postCreateCommand": "echo 'Initialize: export MAKEFLAGS=\"-j6\" && colcon build --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release --parallel-workers 2'",
-    "hostRequirements": {
-        "gpu": "optional"
-    },
-    "runArgs": ["--privileged",
-                "--network=host",
-                "--gpus=all",
-                //"--runtime=nvidia", // uncommment this if rtabmap doesn't show up in nvidia-smi on the host computer
-                "--env=DISPLAY",
-                "--env=QT_X11_NO_MITSHM=1",
-                "--volume=/tmp/.X11-unix:/tmp/.X11-unix"],
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/uav_ws/src/rtabmap_slam_ros2,type=bind",
+    "workspaceFolder": "/home/vscode/uav_ws",
+    "postCreateCommand": "bash -c 'source /opt/ros/jazzy/setup.bash && export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp && colcon build --packages-select uav_nodes uav_slam_launch --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 --parallel-workers 2 && echo BUILD OK'",
+    "runArgs": [
+        "--privileged",
+        "--network=host",
+        "--env=DISPLAY",
+        "--env=QT_X11_NO_MITSHM=1",
+        "--env=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp",
+        "--volume=/tmp/.X11-unix:/tmp/.X11-unix",
+        "--device=/dev/bus/usb"
+    ],
     "containerEnv": {
-        "NVIDIA_VISIBLE_DEVICES": "all"
+        "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+        "ROS_DOMAIN_ID": "0"
     }
 }
