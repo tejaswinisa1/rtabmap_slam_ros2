@@ -1,11 +1,12 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 package_name = 'uav_nodes'
 
 setup(
     name=package_name,
     version='1.0.0',
-    packages=[package_name],
+    # find_packages() required for Python 3.12 (Ubuntu 24.04 / ROS2 Jazzy)
+    packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),

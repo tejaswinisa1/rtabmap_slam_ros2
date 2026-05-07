@@ -1,13 +1,15 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>uav_nodes</name>
-  <version>1.0.0</version>
-  <description>UAV-specific ROS2 nodes: lawnmower planner, path optimizer, ORB detector, duplicate filter, vision-pose bridge</description>
+  <version>2.0.0</version>
+  <description>UAV-specific ROS2 nodes — ROS2 Jazzy / Python 3.12 compatible
+  Includes: lawnmower planner, path optimizer, ORB detector, duplicate filter, vision-pose bridge</description>
   <maintainer email="uav@example.com">UAV Team</maintainer>
   <license>BSD</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 
+  <!-- ROS2 Jazzy Python dependencies -->
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
@@ -15,6 +17,11 @@
   <depend>sensor_msgs</depend>
   <depend>mavros_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>tf2_ros</depend>
+
+  <!-- Python 3.12 system packages -->
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

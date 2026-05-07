@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CycloneDDS Configuration for UAV SLAM on Raspberry Pi 5
+  ROS2 Jazzy — Ubuntu 24.04
+
+  Optimised for:
+  - Low-latency local communication (SLAM → MAVROS → PX4)
+  - Reduced network overhead on Pi 5
+  - Single-machine deployment (no multicast needed)
+
+  Usage:
+    export CYCLONEDDS_URI=file:///path/to/cyclonedds.xml
+    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+  Or source the env script:
+    source uav_slam_launch/config/cyclonedds_env.sh
+-->
+<CycloneDDS>
+  <Domain>
+    <General>
+      <!-- Restrict to loopback for single-machine UAV deployment -->
+      <!-- Change to your network interface (e.g., eth0, wlan0) for multi-machine -->
+      <NetworkInterfaceAddress>lo</NetworkInterfaceAddress>
+      <AllowMulticast>false</AllowMulticast>
+      <MaxMessageSize>65500B</MaxMessageSize>
+      <FragmentSize>4000B</FragmentSize>
+    </General>
+
+    <Internal>
+      <!-- Reduce discovery overhead on Pi 5 -->
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxParticipants>10</MaxParticipants>
+
+      <!-- Tune receive buffer for image topics -->
+      <SocketReceiveBufferSize min="1MB">10MB</SocketReceiveBufferSize>
+
+      <!-- Reduce CPU usage from DDS threads -->
+      <Watermarks>
+        <WhcHigh>500kB</WhcHigh>
+      </Watermarks>
+    </Internal>
+
+    <Tracing>
+      <!-- Set to "warning" or "error" in production to reduce log noise -->
+      <Verbosity>warning</Verbosity>
+      <OutputFile>stderr</OutputFile>
+    </Tracing>
+  </Domain>
+</CycloneDDS>

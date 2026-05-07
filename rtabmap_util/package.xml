@@ -18,7 +18,7 @@
   <depend>image_transport</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
-  <depend>octomap_msgs</depend>
+  <!-- octomap_msgs removed: dense 3D mapping disabled for UAV lightweight mode -->
   <depend>sensor_msgs</depend>
   <depend>stereo_msgs</depend>
   <depend>nav_msgs</depend>
@@ -33,7 +33,7 @@
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_sync</depend>
-  <depend>grid_map_ros</depend>
+  <!-- grid_map_ros removed: ground-robot costmap dep, not available on Jazzy UAV build -->
 
   <export>
 	<build_type>ament_cmake</build_type>

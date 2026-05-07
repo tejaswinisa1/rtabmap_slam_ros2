@@ -1,20 +1,37 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>uav_slam_launch</name>
-  <version>1.0.0</version>
-  <description>UAV SLAM launch files for Raspberry Pi 5 + D435 + PX4</description>
+  <version>2.0.0</version>
+  <description>UAV SLAM launch files — ROS2 Jazzy / Ubuntu 24.04 / Raspberry Pi 5 + D435 + PX4</description>
   <maintainer email="uav@example.com">UAV Team</maintainer>
   <license>BSD</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- ROS2 Jazzy core -->
   <exec_depend>rtabmap_slam</exec_depend>
   <exec_depend>rtabmap_odom</exec_depend>
   <exec_depend>rtabmap_sync</exec_depend>
   <exec_depend>rtabmap_util</exec_depend>
+
+  <!-- Camera driver -->
   <exec_depend>realsense2_camera</exec_depend>
+
+  <!-- PX4 integration -->
   <exec_depend>mavros</exec_depend>
+  <exec_depend>mavros_msgs</exec_depend>
+
+  <!-- DDS middleware -->
+  <exec_depend>rmw_cyclonedds_cpp</exec_depend>
+
+  <!-- UAV-specific nodes -->
   <exec_depend>uav_nodes</exec_depend>
+
+  <!-- TF -->
+  <exec_depend>tf2_ros</exec_depend>
+
+  <!-- Visualization -->
+  <exec_depend>rviz2</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

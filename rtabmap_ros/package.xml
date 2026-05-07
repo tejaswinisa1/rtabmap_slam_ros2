@@ -14,8 +14,8 @@
   
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- UAV stack: rtabmap_demos + rtabmap_costmap_plugins removed (ground-robot only) -->
   <exec_depend>rtabmap_conversions</exec_depend>
-  <exec_depend>rtabmap_demos</exec_depend>
   <exec_depend>rtabmap_examples</exec_depend>
   <exec_depend>rtabmap_launch</exec_depend>
   <exec_depend>rtabmap_msgs</exec_depend>
@@ -26,7 +26,8 @@
   <exec_depend>rtabmap_sync</exec_depend>
   <exec_depend>rtabmap_util</exec_depend>
   <exec_depend>rtabmap_viz</exec_depend>
-  <exec_depend>rtabmap_costmap_plugins</exec_depend>
+  <exec_depend>uav_nodes</exec_depend>
+  <exec_depend>uav_slam_launch</exec_depend>
   
   <export>
     <build_type>ament_cmake</build_type>
